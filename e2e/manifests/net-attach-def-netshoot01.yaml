@@ -1,0 +1,10 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: net-attach-def-netshoot01
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "type": "host-device",
+      "device": "tap0"
+    }'

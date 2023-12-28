@@ -1,0 +1,84 @@
+name: kubernetes-testbed
+on:
+  pull_request:
+  push:
+    branches:
+      - 'main'
+env:
+  go-version: "1.20"
+jobs:
+  k8s-testbed:
+    name: Kubernetes testbed
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.go-version }}
+      - name: Download containernetowrking/plugins
+        run: |
+          make plugins
+          ls -lat bin/cni
+      - name: Setup kind cluster
+        uses: helm/kind-action@v1.5.0
+        with:
+          version: "v0.20.0"
+          config: "e2e/manifests/kind-k8sdev-no-cni.yaml"
+          cluster_name: 'k8sdev'
+      - name: Check kind cluster and deploy CNI tools (flannel and multus)
+        run: |
+          which docker || true
+          which kind || true
+          which kubectl || true
+          kind get clusters || true
+          kubectl cluster-info --context kind-k8sdev || true
+          kubectl config get-contexts || true
+          kubectl --context kind-k8sdev get nodes || true
+          docker network ls || true
+          kubectl apply -f e2e/manifests/kube-flannel.yaml
+          kubectl apply -f e2e/manifests/multus-daemonset-thick.yaml
+      - name: Crate external network by containerlab
+        run: |
+          docker pull ghcr.io/srl-labs/clab
+          docker run --rm -t --privileged \
+              --network host \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v /var/run/netns:/var/run/netns \
+              -v /etc/hosts:/etc/hosts \
+              -v /var/lib/docker/containers:/var/lib/docker/containers \
+              --pid="host" \
+              -v $(pwd):$(pwd) \
+              -w $(pwd) \
+              ghcr.io/srl-labs/clab \
+              containerlab deploy --network kind --topo e2e/clab/sample-topology.yaml
+      - name: Setup and integrate containerlab and k8s-node networks
+        run: |
+          e2e/scripts/setup_kind_netns.sh nosudo
+          ip netns ls
+          sudo ip link add to-leaf type veth peer name from-leaf-to-br
+          sudo ip link set to-leaf netns clab-sample-topology-leaf
+          sudo ip link set from-leaf-to-br netns k8sdev-worker
+          sudo ip netns exec clab-sample-topology-leaf ip addr add 192.168.0.11/24 dev to-leaf
+          sudo ip netns exec clab-sample-topology-leaf ip link set to-leaf up
+          sudo ip netns exec k8sdev-worker ip link add br-secondary type bridge
+          sudo ip netns exec k8sdev-worker ip link add to-pod type veth peer name from-pod-to-br
+          sudo ip netns exec k8sdev-worker ip link set dev from-pod-to-br master br-secondary
+          sudo ip netns exec k8sdev-worker ip link set dev from-leaf-to-br master br-secondary
+          sudo ip netns exec k8sdev-worker ip link set br-secondary up
+          sudo ip netns exec k8sdev-worker ip link set from-pod-to-br up
+          sudo ip netns exec k8sdev-worker ip link set from-leaf-to-br up
+          sudo ip netns exec k8sdev-worker ip link set to-pod up
+      - name: Confirm networks
+        run: |
+          echo "----- default netns ------"
+          sudo ip addr
+          echo "------ k8sdev-worker netns ------"
+          sudo ip netns exec k8sdev-worker ip addr
+          echo "------ clab-sample-topology-leaf netns ------"
+          sudo ip netns exec clab-sample-topology-leaf ip addr
+      - name: Test secondary nic pod's reachability
+        run: |
+          kubectl apply -f e2e/manifests/net-attach-def-veth01.yaml
+          kubectl apply -f e2e/manifests/pod-netshoot-veth01.yaml
+          e2e/scripts/confirm.sh
+          sudo ip netns exec clab-sample-topology-leaf ping -c 1 192.168.0.10
