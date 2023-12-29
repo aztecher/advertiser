@@ -82,6 +82,7 @@ cov-report: gcov2lcov test  ## Build test coverage report in lcov format
 .PHONY: build-cni
 build-cni: ## build CNI
 	$(GO_BUILD_OPTS) go build -ldflags $(GO_LDFLAGS) -o $(BUILD_DIR)/advertiser ./cmd/advertiser/main.go
+	cp $(BUILD_DIR)/advertiser $(LOCALCNIBIN)/advertiser
 
 .PHONY: build
 build: build-cni ## Build project binaries
@@ -96,6 +97,10 @@ LOCALBIN ?= $(PROJECT_DIR)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
+LOCALCNIBIN ?= $(LOCALBIN)/cni
+$(LOCALCNIBIN):
+	mkdir -p $(LOCALCNIBIN)
+
 ##@ Tools
 
 ## Tool Binaries
@@ -109,6 +114,7 @@ GOLANGCILINT_VERSION ?= v1.52.2
 GCOV2LCOV_VERSION ?= v1.0.5
 MOCKERY_VERSION ?= v2.27.1
 CNITOOL_VERSION ?= v1.1.2
+PLUGINS_VERSION ?= v1.4.0
 
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCILINT) ## Download golangci-lint locally if necessary.
@@ -127,5 +133,9 @@ $(MOCKERY): | $(LOCALBIN)
 
 .PHONY: cnitool
 cnitool: | $(CNITOOL) ## Download cnitool locally if necessary.
-$(CNITOOL): | $(CNITOOL)
+$(CNITOOL): | $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install github.com/containernetworking/cni/cnitool@$(CNITOOL_VERSION)
+
+.PHONY: plugins
+plugins: $(LOCALCNIBIN) ## Download containernetworking/plugins locally.
+	curl -sfL https://github.com/containernetworking/plugins/releases/download/$(PLUGINS_VERSION)/cni-plugins-linux-amd64-$(PLUGINS_VERSION).tgz | tar -xz -C $(LOCALCNIBIN)
