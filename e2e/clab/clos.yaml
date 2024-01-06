@@ -1,0 +1,100 @@
+name: clos
+
+mgmt:
+  network: fixedips
+  ipv4-subnet: 172.20.0.0/24
+
+topology:
+  nodes:
+    leaf1:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.10
+      binds:
+        - leaf1/daemons:/etc/frr/daemons
+        - leaf1/frr.conf:/etc/frr/frr.conf
+        - leaf1/vtysh.conf:/etc/frr/vtysh.conf
+        - leaf1/bfdd.conf:/etc/frr/bfdd.conf
+    leaf2:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.11
+      binds:
+        - leaf2/daemons:/etc/frr/daemons
+        - leaf2/frr.conf:/etc/frr/frr.conf
+        - leaf2/vtysh.conf:/etc/frr/vtysh.conf
+        - leaf2/bfdd.conf:/etc/frr/bfdd.conf
+    spine1:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.20
+      binds:
+        - spine1/daemons:/etc/frr/daemons
+        - spine1/frr.conf:/etc/frr/frr.conf
+        - spine1/vtysh.conf:/etc/frr/vtysh.conf
+        - spine1/bfdd.conf:/etc/frr/bfdd.conf
+    spine2:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.21
+      binds:
+        - spine2/daemons:/etc/frr/daemons
+        - spine2/frr.conf:/etc/frr/frr.conf
+        - spine2/vtysh.conf:/etc/frr/vtysh.conf
+        - spine2/bfdd.conf:/etc/frr/bfdd.conf
+    spine3:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.22
+      binds:
+        - spine3/daemons:/etc/frr/daemons
+        - spine3/frr.conf:/etc/frr/frr.conf
+        - spine3/vtysh.conf:/etc/frr/vtysh.conf
+        - spine3/bfdd.conf:/etc/frr/bfdd.conf
+    spine4:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.23
+      binds:
+        - spine4/daemons:/etc/frr/daemons
+        - spine4/frr.conf:/etc/frr/frr.conf
+        - spine4/vtysh.conf:/etc/frr/vtysh.conf
+        - spine4/bfdd.conf:/etc/frr/bfdd.conf
+    superspine1:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.30
+      binds:
+        - superspine1/daemons:/etc/frr/daemons
+        - superspine1/frr.conf:/etc/frr/frr.conf
+        - superspine1/vtysh.conf:/etc/frr/vtysh.conf
+        - superspine1/bfdd.conf:/etc/frr/bfdd.conf
+    superspine2:
+      kind: linux
+      image: frrouting/frr:v8.4.0
+      mgmt-ipv4: 172.20.0.31
+      binds:
+        - superspine2/daemons:/etc/frr/daemons
+        - superspine2/frr.conf:/etc/frr/frr.conf
+        - superspine2/vtysh.conf:/etc/frr/vtysh.conf
+        - superspine2/bfdd.conf:/etc/frr/bfdd.conf
+  links:
+  # Links from leaf1 to spine1-4
+  - endpoints: ["leaf1:to-spine1", "spine1:from-leaf1"]
+  - endpoints: ["leaf1:to-spine2", "spine2:from-leaf1"]
+  # Links from worker-leaf1 to spine1-4
+  - endpoints: ["leaf2:to-spine3", "spine3:from-leaf2"]
+  - endpoints: ["leaf2:to-spine4", "spine4:from-leaf2"]
+  # Links from spine1 to superspine1-2
+  - endpoints: ["spine1:to-superspine1", "superspine1:from-spine1"]
+  - endpoints: ["spine1:to-superspine2", "superspine2:from-spine1"]
+  # Links from spine2 to superspine1-2
+  - endpoints: ["spine2:to-superspine1", "superspine1:from-spine2"]
+  - endpoints: ["spine2:to-superspine2", "superspine2:from-spine2"]
+  # Links from spine3 to superspine1-2
+  - endpoints: ["spine3:to-superspine1", "superspine1:from-spine3"]
+  - endpoints: ["spine3:to-superspine2", "superspine2:from-spine3"]
+  # Links from spine4 to superspine1-2
+  - endpoints: ["spine4:to-superspine1", "superspine1:from-spine4"]
+  - endpoints: ["spine4:to-superspine2", "superspine2:from-spine4"]
+
