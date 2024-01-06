@@ -140,5 +140,5 @@ kubectl apply -f e2e/manifests/pod-netshoot-veth01.yaml
 After the pod status is Running, check reachability from containerlab to pod.
 
 ```bash
-sudo ip netns exec clab-sample-topology-leaf ping -c 1 192.168.0.11
+kubectl exec -t netshoot-secondary-veth -- ping -c 1 192.168.0.11
 ```
