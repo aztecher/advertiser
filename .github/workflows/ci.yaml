@@ -50,16 +50,22 @@ jobs:
               -v $(pwd):$(pwd) \
               -w $(pwd) \
               ghcr.io/srl-labs/clab \
-              containerlab deploy --network kind --topo e2e/clab/sample-topology.yaml
+              containerlab deploy --topo e2e/clab/clos.yaml
       - name: Setup and integrate containerlab and k8s-node networks
         run: |
           e2e/scripts/setup_kind_netns.sh nosudo
           ip netns ls
           sudo ip link add to-leaf type veth peer name from-leaf-to-br
-          sudo ip link set to-leaf netns clab-sample-topology-leaf
+          sudo ip link set to-leaf netns clab-clos-leaf1
           sudo ip link set from-leaf-to-br netns k8sdev-worker
-          sudo ip netns exec clab-sample-topology-leaf ip addr add 192.168.0.11/24 dev to-leaf
-          sudo ip netns exec clab-sample-topology-leaf ip link set to-leaf up
+          sudo ip netns exec clab-clos-leaf1 ip link add br-local type bridge
+          sudo ip netns exec clab-clos-leaf1 ip link set dev to-leaf master br-local
+          sudo ip netns exec clab-clos-leaf1 ip addr add 192.168.1.1/24 dev br-local
+          sudo ip netns exec clab-clos-leaf1 ip link set br-local up
+          sudo ip netns exec clab-clos-leaf1 ip link set to-leaf up
+          sudo ip netns exec clab-clos-leaf1 ip addr add 192.168.0.10/24 dev to-spine1
+          sudo ip netns exec clab-clos-leaf1 iptables -t nat -I POSTROUTING -s 192.168.1.10 -j SNAT -o to-spine1 --to-source 192.168.0.10
+          sudo ip netns exec clab-clos-leaf2 ip addr add 192.168.0.11/24 dev to-spine3
           sudo ip netns exec k8sdev-worker ip link add br-secondary type bridge
           sudo ip netns exec k8sdev-worker ip link add to-pod type veth peer name from-pod-to-br
           sudo ip netns exec k8sdev-worker ip link set dev from-pod-to-br master br-secondary
@@ -70,15 +76,49 @@ jobs:
           sudo ip netns exec k8sdev-worker ip link set to-pod up
       - name: Confirm networks
         run: |
-          echo "----- default netns ------"
+          echo "----- waitint for 10 secs for BGP advertisement -----"
+          sleep 10s
+          echo "----- default netns -----"
           sudo ip addr
-          echo "------ k8sdev-worker netns ------"
+          echo "----- k8sdev-worker netns -----"
           sudo ip netns exec k8sdev-worker ip addr
-          echo "------ clab-sample-topology-leaf netns ------"
-          sudo ip netns exec clab-sample-topology-leaf ip addr
+          echo "----- clab-clos-leaf1 netns -----"
+          docker exec -t clab-clos-leaf1 ip addr
+          docker exec -t clab-clos-leaf1 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-leaf1 vtysh -c 'show ip route'
+          echo "----- clab-clos-leaf2 netns -----"
+          docker exec -t clab-clos-leaf2 ip addr
+          docker exec -t clab-clos-leaf2 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-leaf2 vtysh -c 'show ip route'
+          echo "----- clab-clos-spine1 netns -----"
+          docker exec -t clab-clos-spine1 ip addr
+          docker exec -t clab-clos-spine1 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-spine1 vtysh -c 'show ip route'
+          echo "----- clab-clos-spine2 netns -----"
+          docker exec -t clab-clos-spine2 ip addr
+          docker exec -t clab-clos-spine2 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-spine2 vtysh -c 'show ip route'
+          echo "----- clab-clos-spine3 netns -----"
+          docker exec -t clab-clos-spine3 ip addr
+          docker exec -t clab-clos-spine3 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-spine3 vtysh -c 'show ip route'
+          echo "----- clab-clos-spine4 netns -----"
+          docker exec -t clab-clos-spine4 ip addr
+          docker exec -t clab-clos-spine4 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-spine4 vtysh -c 'show ip route'
+          echo "----- clab-clos-superspine1 netns -----"
+          docker exec -t clab-clos-superspine1 ip addr
+          docker exec -t clab-clos-superspine1 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-superspine1 vtysh -c 'show ip route'
+          echo "----- clab-clos-superspine2 netns -----"
+          docker exec -t clab-clos-superspine2 ip addr
+          docker exec -t clab-clos-superspine2 vtysh -c 'show ip bgp summary'
+          docker exec -t clab-clos-superspine2 vtysh -c 'show ip route'
       - name: Test secondary nic pod's reachability
         run: |
           kubectl apply -f e2e/manifests/net-attach-def-veth01.yaml
           kubectl apply -f e2e/manifests/pod-netshoot-veth01.yaml
           e2e/scripts/confirm.sh
-          sudo ip netns exec clab-sample-topology-leaf ping -c 1 192.168.0.10
+          kubectl exec -t netshoot-secondary-veth -- ip addr
+          kubectl exec -t netshoot-secondary-veth -- ip route
+          kubectl exec -t netshoot-secondary-veth -- ping -c 1 192.168.0.11

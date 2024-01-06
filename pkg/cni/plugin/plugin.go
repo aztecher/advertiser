@@ -1,9 +1,10 @@
 package plugin
 
 import (
+	"github.com/aztecher/advertiser/pkg/cni/types"
 	"github.com/aztecher/advertiser/pkg/version"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
 
 	log "github.com/k8snetworkplumbingwg/cni-log"
@@ -14,19 +15,22 @@ const (
 )
 
 type Plugin struct {
-	Name    string
-	Version string
+	Name       string
+	Version    string
+	ConfLoader types.ConfLoader
 }
 
 func NewPlugin() *Plugin {
 	return &Plugin{
-		Name:    CNIPluginName,
-		Version: version.GetVersionString(),
+		Name:       CNIPluginName,
+		Version:    version.GetVersionString(),
+		ConfLoader: types.NewConfLoader(),
 	}
 }
 
 func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
-	return types.PrintResult(&current.Result{}, "0.4.0")
+	log.Infof("args: %s\n", string(args.StdinData))
+	return cnitypes.PrintResult(&current.Result{}, "0.4.0")
 }
 
 func (p *Plugin) CmdDel(args *skel.CmdArgs) error {

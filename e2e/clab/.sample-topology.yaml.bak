@@ -1,7 +1,0 @@
-name: sample-topology
-
-topology:
-  nodes:
-    leaf:
-      kind: linux
-      image: frrouting/frr:v8.4.0
